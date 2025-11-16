@@ -1,0 +1,154 @@
+{
+  "features": [
+    {
+      "featureId": "feature-01",
+      "name": "Database Schema & Data Models",
+      "description": "Foundation database schema defining User, Subscription, UserPreferences, WeeklyGuide, Payment, and SMS/Email delivery tracking. Critical for all other features.",
+      "agentAssigned": "schema-builder",
+      "dependencies": [],
+      "files": ["src/db/schema.ts", "src/db/migrations/001_initial_schema.sql"],
+      "detailedPrompt": "Create a comprehensive database schema for the pregnancy guide service. Required tables: users (id, email, due_date, created_at), subscriptions (id, user_id, tier, status, start_date, end_date), user_preferences (id, user_id, health_conditions, symptoms, lifestyle_factors, dietary_restrictions), weekly_guides (id, user_id, week_number, content, generated_at, delivered_at), payments (id, user_id, amount, status, stripe_id), delivery_logs (id, user_id, method, status, sent_at). Include indexes for frequent queries, timestamps, and soft deletes where appropriate.",
+      "estimatedMinutes": 45
+    },
+    {
+      "featureId": "feature-02",
+      "name": "User Authentication System",
+      "description": "JWT-based authentication with signup, login, password reset. Secure credential management for user accounts.",
+      "agentAssigned": "api-developer",
+      "dependencies": ["feature-01"],
+      "files": ["src/auth/auth.controller.ts", "src/auth/auth.service.ts", "src/auth/jwt.strategy.ts", "src/auth/auth.middleware.ts"],
+      "detailedPrompt": "Implement a secure JWT-based authentication system. Create signup endpoint that validates email and creates user. Create login endpoint that returns JWT token (valid for 24 hours). Implement password hashing with bcrypt. Add password reset functionality via email link. Include email verification for new signups. Add middleware to protect routes requiring authentication. Use environment variables for JWT secret.",
+      "estimatedMinutes": 60
+    },
+    {
+      "featureId": "feature-03",
+      "name": "User Profile & Preferences Management",
+      "description": "API endpoints for managing user profile, health preferences, symptoms, and lifestyle factors. Core personalization data for content generation.",
+      "agentAssigned": "api-developer",
+      "dependencies": ["feature-02"],
+      "files": ["src/users/users.controller.ts", "src/users/users.service.ts", "src/users/dto/user.dto.ts"],
+      "detailedPrompt": "Create endpoints for: GET /users/profile (return user data including due_date, preferences), PUT /users/profile (update email, due_date), GET/PUT /users/preferences (manage health_conditions, symptoms like nausea/fatigue, dietary_restrictions, exercise level, lifestyle_factors). Calculate pregnancy week number from due_date automatically. Validate health conditions against predefined list. Include input sanitization.",
+      "estimatedMinutes": 50
+    },
+    {
+      "featureId": "feature-04",
+      "name": "Subscription & Payment System",
+      "description": "Handle subscription tiers (Basic $7.99-9.99/month, Premium $14.99-19.99/month, Bundle $99-149 one-time). Stripe integration for payments.",
+      "agentAssigned": "integration-specialist",
+      "dependencies": ["feature-01", "feature-02"],
+      "files": ["src/subscriptions/subscriptions.controller.ts", "src/subscriptions/subscriptions.service.ts", "src/stripe/stripe.service.ts", "src/subscriptions/dto/subscription.dto.ts"],
+      "detailedPrompt": "Integrate Stripe for payment processing. Create subscription endpoints: POST /subscriptions/create (choose tier), POST /subscriptions/webhook (handle Stripe events), GET /subscriptions/status (check current subscription). Track subscription state (active, cancelled, expired). Implement monthly recurring billing for tiers and one-time payment for bundle. Handle subscription cancellation and renewal. Store Stripe customer_id in database. Validate subscription access for feature gates (SMS only for Premium).",
+      "estimatedMinutes": 70
+    },
+    {
+      "featureId": "feature-05",
+      "name": "User Onboarding Flow",
+      "description": "Guided flow to collect due date, health preferences, symptoms, and lifestyle information from new users. Essential for personalization.",
+      "agentAssigned": "backend-logic",
+      "dependencies": ["feature-03", "feature-04"],
+      "files": ["src/onboarding/onboarding.controller.ts", "src/onboarding/onboarding.service.ts"],
+      "detailedPrompt": "Create a structured onboarding endpoint POST /onboarding/complete that accepts: due_date (required, future date validation), health_conditions (array from predefined list), current_symptoms (user-reported), dietary_restrictions (array), exercise_level (1-5 scale), medications (optional), previous_pregnancies (count), lifestyle_factors (smoking, caffeine, sleep). Mark onboarding as complete in user record. Return success with calculated current pregnancy week. This data powers AI personalization.",
+      "estimatedMinutes": 40
+    },
+    {
+      "featureId": "feature-06",
+      "name": "AI Content Generation Engine",
+      "description": "Generate personalized weekly pregnancy guides using OpenAI API. Create week-specific content tailored to user's preferences, symptoms, and health data.",
+      "agentAssigned": "integration-specialist",
+      "dependencies": ["feature-03", "feature-05"],
+      "files": ["src/ai/ai.service.ts", "src/ai/prompts.ts", "src/guides/guides.service.ts"],
+      "detailedPrompt": "Implement OpenAI API integration to generate weekly guides. Create a prompt template that includes: current pregnancy week, user's health conditions, reported symptoms, dietary restrictions, exercise level, previous pregnancy history. The generated guide should include: (1) Fetal Development - week-specific development milestones, (2) Nutrition Tips - personalized based on restrictions/symptoms, (3) Exercise Recommendations - safe activities for current week, (4) Symptom Explanations - explain user's reported symptoms, (5) Preparation Advice - what to prepare for upcoming weeks. Response should be markdown formatted. Store generated content in database. Include error handling for API failures.",
+      "estimatedMinutes": 75
+    },
+    {
+      "featureId": "feature-07",
+      "name": "Email Delivery System",
+      "description": "Send personalized weekly guides via email to all users. Automated delivery on schedule (e.g., Sunday morning).",
+      "agentAssigned": "integration-specialist",
+      "dependencies": ["feature-06"],
+      "files": ["src/delivery/email.service.ts", "src/delivery/email-templates.ts", "src/scheduler/email-scheduler.service.ts"],
+      "detailedPrompt": "Integrate email service (SendGrid/Mailgun). Create email service that sends formatted weekly guides with user's name personalized. Implement template: header with week number (Week X of 40), guide content from AI generation, footer with support link. Schedule weekly delivery (e.g., Sundays at 7am user's timezone). Track delivery status (sent, failed, bounced). Handle unsubscribe requests. Log all delivery attempts. Use environment variables for API keys. Include retry logic for failed sends.",
+      "estimatedMinutes": 60
+    },
+    {
+      "featureId": "feature-08",
+      "name": "SMS Delivery System",
+      "description": "Send SMS notifications to Premium subscribers with summaries or reminders. Feature-gated to Premium tier only.",
+      "agentAssigned": "integration-specialist",
+      "dependencies": ["feature-06", "feature-04"],
+      "files": ["src/delivery/sms.service.ts", "src/scheduler/sms-scheduler.service.ts"],
+      "detailedPrompt": "Integrate SMS service (Twilio). Create SMS service for Premium subscribers only. Send weekly SMS with brief guide summary and link to full guide. Implement SMS opt-in/opt-out. Check subscription tier before sending (Premium only). Track SMS delivery status. Handle number validation. Create SMS templates with character limits (160 chars). Schedule SMS at different time than email (e.g., Wednesday). Include retry logic and error handling.",
+      "estimatedMinutes": 55
+    },
+    {
+      "featureId": "feature-09",
+      "name": "User Dashboard & Web Interface",
+      "description": "React frontend displaying user profile, current pregnancy week, guide history, account settings, and subscription management.",
+      "agentAssigned": "frontend-developer",
+      "dependencies": ["feature-03", "feature-04"],
+      "files": ["src/components/Dashboard.tsx", "src/components/ProfileSettings.tsx", "src/components/GuideHistory.tsx", "src/components/SubscriptionStatus.tsx", "src/pages/dashboard.tsx"],
+      "detailedPrompt": "Build a responsive React dashboard with: (1) Header showing current pregnancy week and days until due date, (2) Latest Guide section displaying most recent guide with formatted content, (3) Profile Settings panel with due date, health conditions, symptoms, lifestyle inputs - allow updates, (4) Guide History showing past 12 weeks with expandable view, (5) Subscription Status showing tier, renewal date, billing history, (6) Account Settings with email, password change, timezone selection. Use React hooks for state. Add loading states and error boundaries. Implement protected routes.",
+      "estimatedMinutes": 90
+    },
+    {
+      "featureId": "feature-10",
+      "name": "Weekly Guide Management & History",
+      "description": "API endpoints to retrieve, store, and manage weekly guide content. Track delivery status and user access to guides.",
+      "agentAssigned": "api-developer",
+      "dependencies": ["feature-06"],
+      "files": ["src/guides/guides.controller.ts", "src/guides/guides.service.ts"],
+      "detailedPrompt": "Create endpoints: GET /guides/current (current week's guide), GET /guides/week/:weekNumber (specific week), GET /guides/history (all generated guides for user), GET /guides/next (preview next week if available). Each response includes: guide_id, week_number, generated_at, delivered_at, content. Implement pagination for history (limit 12 per page). Allow users to mark guides as read. Include search/filter by week range.",
+      "estimatedMinutes": 45
+    },
+    {
+      "featureId": "feature-11",
+      "name": "Premium Q&A Interactive Feature",
+      "description": "Allow Premium subscribers to submit pregnancy questions and receive AI-powered answers. Feature-gated to Premium only.",
+      "agentAssigned": "backend-logic",
+      "dependencies": ["feature-04", "feature-06"],
+      "files": ["src/qa/qa.controller.ts", "src/qa/qa.service.ts"],
+      "detailedPrompt": "Create Q&A endpoints for Premium users only: POST /qa/ask (submit question), GET /qa/history (view past Q&As), DELETE /qa/:id (delete question). When question submitted, use OpenAI to generate personalized answer considering user's pregnancy week, health conditions, and symptoms. Store Q&A history (limit 50 per user). Validate subscription tier before allowing access. Include response validation and formatting. Add rate limiting (5 questions per week).",
+      "estimatedMinutes": 50
+    },
+    {
+      "featureId": "feature-12",
+      "name": "Admin Dashboard & Analytics",
+      "description": "Admin interface for monitoring subscribers, guide generation status, delivery metrics, and platform health.",
+      "agentAssigned": "frontend-developer",
+      "dependencies": ["feature-02", "feature-07", "feature-08"],
+      "files": ["src/components/admin/AdminDashboard.tsx", "src/components/admin/UserManagement.tsx", "src/components/admin/AnalyticsPanel.tsx", "src/admin/admin.controller.ts"],
+      "detailedPrompt": "Build admin panel with: (1) Summary cards showing total users, active subscriptions, MRR, email/SMS delivery rates, (2) User list with search/filter by tier/status/signup date, (3) Guide generation status - last run time, failure count, retry queue, (4) Delivery metrics - email open rates, bounce rates, SMS delivery success %, (5) Payment monitoring - recent transactions, failed charges, churn rate, (6) System health - error logs, API response times. Restrict access to admin role only. Add bulk actions for user management.",
+      "estimatedMinutes": 80
+    },
+    {
+      "featureId": "feature-13",
+      "name": "Automated Weekly Guide Generation & Delivery Pipeline",
+      "description": "Background job/scheduler that automatically generates and delivers guides each week. Core automation for scalability.",
+      "agentAssigned": "backend-logic",
+      "dependencies": ["feature-06", "feature-07", "feature-08"],
+      "files": ["src/scheduler/guide-generation.job.ts", "src/scheduler/scheduler.service.ts", "src/scheduler/queue.service.ts"],
+      "detailedPrompt": "Implement background job (e.g., Node-schedule or Bull queue) that runs weekly (Sunday 6am UTC): For each active subscriber, (1) Calculate if new week has started based on due_date, (2) Call AI content generation with user's latest preferences, (3) Save guide to database, (4) Queue email delivery if user active, (5) Queue SMS delivery if Premium subscriber, (6) Update delivery status. Handle errors gracefully with retry logic (3 retries). Log completion status. Include monitoring for job failures. Prevent duplicate generations.",
+      "estimatedMinutes": 75
+    },
+    {
+      "featureId": "feature-14",
+      "name": "API Testing & Quality Assurance",
+      "description": "Comprehensive unit tests, integration tests, and e2e tests for all critical flows (auth, subscriptions, content generation, delivery).",
+      "agentAssigned": "integration-tester",
+      "dependencies": ["feature-02", "feature-04", "feature-06", "feature-07"],
+      "files": ["test/auth.spec.ts", "test/subscriptions.spec.ts", "test/guides.spec.ts", "test/delivery.spec.ts"],
+      "detailedPrompt": "Create test suite covering: (1) Auth - signup validation, login with correct/incorrect password, JWT token validation, password reset flow, (2) Subscriptions - create subscription, handle Stripe webhook, upgrade/downgrade tier, cancel subscription, verify payment processing, (3) Guides - verify AI generation produces valid content, user with preferences receives customized content, week calculation is correct, (4) Delivery - email sent successfully, SMS only sent to Premium users, failed deliveries trigger retries, unsubscribe works. Use Jest and Supertest. Achieve 80%+ coverage of critical paths. Mock external APIs (OpenAI, Stripe, SendGrid).",
+      "estimatedMinutes": 90
+    },
+    {
+      "featureId": "feature-15",
+      "name": "Deployment & DevOps Setup",
+      "description": "Production deployment configuration, environment management, monitoring, and CI/CD pipeline for the service.",
+      "agentAssigned": "devops-engineer",
+      "dependencies": ["feature-02", "feature-04", "feature-06"],
+      "files": [".env.example", "docker-compose.yml", ".github/workflows/deploy.yml", "src/config/environment.ts"],
+      "detailedPrompt": "Set up deployment configuration: (1) Environment variables (.env.example template with Stripe key, OpenAI key, SendGrid/Twilio keys, JWT secret, database URL), (2) Docker setup for containerized deployment, (3) GitHub Actions CI/CD - run tests on PR, deploy to production on merge, (4) Monitoring - error tracking (Sentry), performance metrics (New Relic), uptime monitoring, (5) Database backups - automated daily backups, (6) Health check endpoint GET /health returning status of all services. Include secrets management best practices. Document deployment procedure.",
+      "estimatedMinutes": 70
+    }
+  ]
+}
