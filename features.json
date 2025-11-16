@@ -1,0 +1,241 @@
+{
+  "features": [
+    {
+      "featureId": "feature-01",
+      "name": "Database Schema and Models",
+      "description": "Design and implement the complete database schema including User model (email, password, due date, health preferences, symptoms, lifestyle factors), Subscription model (tier, status, payment info), WeeklyGuide model (week number, content, delivery status), and UserSymptom model for tracking. This is the foundational data layer for the entire pregnancy guide service.",
+      "agentAssigned": "schema-builder",
+      "dependencies": [],
+      "files": [
+        "src/models/User.ts",
+        "src/models/Subscription.ts",
+        "src/models/WeeklyGuide.ts",
+        "src/models/UserSymptom.ts",
+        "src/models/UserPreference.ts",
+        "prisma/schema.prisma"
+      ],
+      "detailedPrompt": "Create database schema for the AI-Powered Pregnancy Weekly Guide Service. Include: User table (id, email, password_hash, due_date, created_at, updated_at), UserPreference table (user_id, health_preferences JSON, dietary_restrictions JSON, exercise_level, lifestyle_factors JSON), Subscription table (id, user_id, tier ENUM(basic, premium, bundle), status ENUM(active, cancelled, expired), stripe_customer_id, stripe_subscription_id, current_period_end, created_at), WeeklyGuide table (id, user_id, pregnancy_week, content TEXT, generated_at, email_sent_at, sms_sent_at, delivery_status), UserSymptom table (id, user_id, pregnancy_week, symptoms JSON, logged_at). Use PostgreSQL-compatible types and ensure proper foreign keys and indexes for performance.",
+      "estimatedMinutes": 45
+    },
+    {
+      "featureId": "feature-02",
+      "name": "User Authentication System",
+      "description": "Implement secure user authentication with JWT tokens, including signup, login, logout, password reset, and session management. This enables users to create accounts and securely access their personalized pregnancy guides.",
+      "agentAssigned": "backend-logic",
+      "dependencies": ["feature-01"],
+      "files": [
+        "src/routes/auth.ts",
+        "src/controllers/authController.ts",
+        "src/middleware/auth.ts",
+        "src/utils/jwt.ts",
+        "src/utils/password.ts"
+      ],
+      "detailedPrompt": "Build authentication system with these endpoints: POST /api/auth/signup (email, password, due_date), POST /api/auth/login (email, password returns JWT), POST /api/auth/logout, POST /api/auth/forgot-password, POST /api/auth/reset-password. Implement bcrypt for password hashing, JWT for token generation with 7-day expiry, middleware to verify JWT on protected routes. Include email validation and password strength requirements (min 8 chars, 1 uppercase, 1 number). Store JWT in httpOnly cookies for security.",
+      "estimatedMinutes": 60
+    },
+    {
+      "featureId": "feature-03",
+      "name": "Stripe Subscription Integration",
+      "description": "Integrate Stripe for handling three subscription tiers: Basic ($7.99-9.99/month), Premium ($14.99-19.99/month), and Bundle ($99-149 one-time). Includes webhook handling for subscription lifecycle events (created, updated, cancelled, payment_failed).",
+      "agentAssigned": "api-developer",
+      "dependencies": ["feature-01", "feature-02"],
+      "files": [
+        "src/routes/subscription.ts",
+        "src/controllers/subscriptionController.ts",
+        "src/services/stripeService.ts",
+        "src/webhooks/stripeWebhook.ts"
+      ],
+      "detailedPrompt": "Implement Stripe integration with endpoints: POST /api/subscription/create-checkout-session (tier: basic|premium|bundle), POST /api/subscription/cancel, GET /api/subscription/status, POST /api/webhooks/stripe (raw body parsing). Create Stripe products and prices for: Basic tier ($8.99 monthly recurring), Premium tier ($16.99 monthly recurring), Bundle tier ($129 one-time payment). Handle webhook events: customer.subscription.created, customer.subscription.updated, customer.subscription.deleted, invoice.payment_failed. Update database Subscription table accordingly. Use Stripe test mode keys from environment variables.",
+      "estimatedMinutes": 75
+    },
+    {
+      "featureId": "feature-04",
+      "name": "User Onboarding Flow",
+      "description": "Create multi-step onboarding wizard collecting due date, health preferences (dietary restrictions, allergies, medical conditions), current symptoms, lifestyle factors (exercise level, work type, stress level), and communication preferences. This data personalizes the AI-generated content.",
+      "agentAssigned": "frontend-developer",
+      "dependencies": ["feature-02"],
+      "files": [
+        "src/components/Onboarding/DueDateStep.tsx",
+        "src/components/Onboarding/HealthPreferencesStep.tsx",
+        "src/components/Onboarding/SymptomsStep.tsx",
+        "src/components/Onboarding/LifestyleStep.tsx",
+        "src/components/Onboarding/OnboardingWizard.tsx",
+        "src/api/onboarding.ts"
+      ],
+      "detailedPrompt": "Build 4-step onboarding wizard: Step 1 - Due date picker (or last menstrual period date with automatic calculation), Step 2 - Health preferences form (dietary restrictions checkboxes: vegetarian, vegan, gluten-free, dairy-free, allergies text input, pre-existing conditions checkboxes), Step 3 - Current symptoms multi-select (nausea, fatigue, back pain, headaches, mood swings, food aversions, cravings), Step 4 - Lifestyle factors (exercise level: sedentary/light/moderate/active, work type: desk/standing/physical, stress level slider 1-10, sleep quality 1-10). Save via POST /api/user/preferences endpoint. Include progress indicator and back/next navigation. Design should be clean, mobile-responsive, and reassuring in tone.",
+      "estimatedMinutes": 90
+    },
+    {
+      "featureId": "feature-05",
+      "name": "AI Content Generation Service",
+      "description": "Core AI service that generates personalized weekly pregnancy guides using OpenAI/Anthropic API. Takes user's pregnancy week, health preferences, symptoms, and lifestyle to create customized content covering fetal development, nutrition tips, exercise recommendations, symptom explanations, and preparation advice.",
+      "agentAssigned": "backend-logic",
+      "dependencies": ["feature-01"],
+      "files": [
+        "src/services/aiContentGenerator.ts",
+        "src/services/openaiClient.ts",
+        "src/templates/promptTemplates.ts",
+        "src/utils/contentFormatter.ts"
+      ],
+      "detailedPrompt": "Create AI content generation service with function generateWeeklyGuide(userId, pregnancyWeek). Fetch user preferences, symptoms, and lifestyle from database. Build comprehensive prompt including: pregnancy week number, fetal development milestones for that week, user's dietary restrictions, current symptoms, exercise level, and specific concerns. Use OpenAI GPT-4 or Anthropic Claude API to generate ~800-1200 word guide with sections: 1) Your Baby This Week (development), 2) Your Body This Week (what to expect), 3) Nutrition Tips (personalized to dietary prefs), 4) Safe Exercises (based on fitness level), 5) Symptom Relief (for current symptoms), 6) This Week's Checklist (preparation tasks). Return structured JSON with each section. Include error handling and retry logic. Store API key in environment variable.",
+      "estimatedMinutes": 90
+    },
+    {
+      "featureId": "feature-06",
+      "name": "Weekly Guide Generation Automation",
+      "description": "Automated cron job that runs daily to check which users need their weekly guide generated based on their pregnancy week. Triggers AI content generation and stores guides in database ready for delivery.",
+      "agentAssigned": "backend-logic",
+      "dependencies": ["feature-01", "feature-05"],
+      "files": [
+        "src/jobs/generateWeeklyGuides.ts",
+        "src/services/pregnancyCalculator.ts",
+        "src/utils/cronScheduler.ts"
+      ],
+      "detailedPrompt": "Create cron job that runs daily at 2 AM UTC. Calculate each active subscriber's current pregnancy week from their due_date (due_date - 280 days = conception date, current_date - conception_date = days pregnant, days/7 = pregnancy week). Check if user already has a guide for current week in WeeklyGuide table. If not, trigger aiContentGenerator.generateWeeklyGuide(userId, pregnancyWeek) and save to database with delivery_status='pending'. Handle edge cases: users past 42 weeks (mark subscription as completed), users in first 4 weeks (offer preconception content). Log generation stats (success/failure counts) for monitoring. Use node-cron or similar scheduler.",
+      "estimatedMinutes": 60
+    },
+    {
+      "featureId": "feature-07",
+      "name": "Email Delivery Integration",
+      "description": "Integrate email service provider (SendGrid/Mailgun/AWS SES) to deliver personalized weekly guides to all users (Basic and Premium tiers). Includes beautiful email templates with pregnancy-specific branding and unsubscribe handling.",
+      "agentAssigned": "integration-specialist",
+      "dependencies": ["feature-01", "feature-06"],
+      "files": [
+        "src/services/emailService.ts",
+        "src/jobs/sendWeeklyEmails.ts",
+        "src/templates/email/weeklyGuideTemplate.html",
+        "src/templates/email/welcomeEmail.html"
+      ],
+      "detailedPrompt": "Integrate SendGrid for email delivery. Create function sendWeeklyGuide(userId, guideContent). Build responsive HTML email template with: header with logo and week number (e.g., 'Week 24: Your Baby is the Size of a Cantaloupe'), formatted guide sections with appropriate styling, footer with unsubscribe link and support email. Create cron job that runs daily at 9 AM user's timezone, fetches all WeeklyGuides with delivery_status='pending', sends emails, updates email_sent_at timestamp and delivery_status='email_sent'. Also create welcome email sent after signup. Handle bounces and unsubscribes via webhook. Use SendGrid API key from environment. Include open/click tracking for analytics.",
+      "estimatedMinutes": 70
+    },
+    {
+      "featureId": "feature-08",
+      "name": "SMS Delivery Integration (Premium Feature)",
+      "description": "Integrate SMS service (Twilio) to send weekly guide summaries via text message to Premium and Bundle subscribers. Provides an additional touchpoint and convenience for users on mobile.",
+      "agentAssigned": "integration-specialist",
+      "dependencies": ["feature-01", "feature-03", "feature-06"],
+      "files": [
+        "src/services/smsService.ts",
+        "src/jobs/sendWeeklySMS.ts",
+        "src/utils/smsSummarizer.ts"
+      ],
+      "detailedPrompt": "Integrate Twilio for SMS delivery (Premium tier only). Create function sendWeeklySMS(userId, guideContent). Extract 160-character summary from full guide content highlighting the most important point for the week (e.g., 'Week 20: Baby can hear your voice! Focus on iron-rich foods. Your anatomy scan is coming up. Read full guide: [link]'). Add user phone number field to User model. Create cron job running daily at 10 AM, check for Premium/Bundle subscribers with delivery_status='email_sent', send SMS, update sms_sent_at timestamp and delivery_status='delivered'. Handle opt-out/STOP commands. Use Twilio API credentials from environment. Consider cost optimization (only send if user opted in to SMS).",
+      "estimatedMinutes": 55
+    },
+    {
+      "featureId": "feature-09",
+      "name": "Symptom Tracking Feature",
+      "description": "Allow users to log weekly symptoms which feed into AI content personalization. Users can update their symptom profile weekly, and the AI uses this data to make guides more relevant to their current experience.",
+      "agentAssigned": "backend-logic",
+      "dependencies": ["feature-01", "feature-02"],
+      "files": [
+        "src/routes/symptoms.ts",
+        "src/controllers/symptomController.ts",
+        "src/components/SymptomLogger.tsx"
+      ],
+      "detailedPrompt": "Build symptom tracking with endpoints: POST /api/symptoms/log (pregnancy_week, symptoms array, severity, notes), GET /api/symptoms/history (returns user's symptom log by week), PUT /api/symptoms/:id. Frontend: Create SymptomLogger component with multi-select for common symptoms (morning sickness, fatigue, back pain, leg cramps, heartburn, constipation, mood swings, headaches, swelling, shortness of breath, frequent urination, food aversions/cravings, Braxton Hicks contractions). Add severity slider 1-5 for each selected symptom and optional notes textarea. Show historical chart of symptom progression. Make this data available to AI content generator to personalize advice. Include reminder notification for users to log symptoms weekly.",
+      "estimatedMinutes": 65
+    },
+    {
+      "featureId": "feature-10",
+      "name": "Interactive Q&A Feature (Premium)",
+      "description": "Premium-tier feature allowing users to ask pregnancy-related questions and receive AI-generated personalized answers. Limited to reasonable usage (e.g., 10 questions/month for Premium tier) to manage AI costs.",
+      "agentAssigned": "backend-logic",
+      "dependencies": ["feature-01", "feature-02", "feature-03", "feature-05"],
+      "files": [
+        "src/routes/qa.ts",
+        "src/controllers/qaController.ts",
+        "src/services/qaService.ts",
+        "src/components/QAInterface.tsx",
+        "src/models/Question.ts"
+      ],
+      "detailedPrompt": "Build Q&A system for Premium subscribers: Create Question model (id, user_id, question_text, answer_text, pregnancy_week, asked_at, answered_at). Endpoints: POST /api/qa/ask (question text, max 500 chars), GET /api/qa/history. Implement usage limit checking (10 questions/month for Premium, store count in Subscription table). Use AI service to generate answers considering user's context (pregnancy week, health preferences, recent symptoms). Prompt should include disclaimer that this is educational info, not medical advice. Frontend: QAInterface component with question input, remaining questions counter, history of past Q&As with timestamps. Answers should be 200-400 words, empathetic in tone, and include 'When to call your doctor' section for serious symptoms.",
+      "estimatedMinutes": 80
+    },
+    {
+      "featureId": "feature-11",
+      "name": "User Dashboard",
+      "description": "Main dashboard showing current pregnancy week with visual progress indicator, countdown to due date, next guide delivery date, recent symptoms, quick access to Q&A (Premium), and subscription management. The central hub for user engagement.",
+      "agentAssigned": "frontend-developer",
+      "dependencies": ["feature-02", "feature-09"],
+      "files": [
+        "src/pages/Dashboard.tsx",
+        "src/components/Dashboard/WeekProgress.tsx",
+        "src/components/Dashboard/DueDateCountdown.tsx",
+        "src/components/Dashboard/RecentGuides.tsx",
+        "src/components/Dashboard/QuickStats.tsx"
+      ],
+      "detailedPrompt": "Create user dashboard with: 1) Hero section showing current week (e.g., 'Week 18' with fruit size comparison 'Your baby is the size of a bell pepper'), 2) Visual progress bar showing weeks 1-40 with current position highlighted, 3) Countdown to due date in days/weeks, 4) Card showing next guide delivery date, 5) Recent symptoms summary with link to log new symptoms, 6) List of last 3 guides with 'View' links, 7) For Premium users: Q&A quick access and questions remaining this month, 8) Subscription status card with upgrade/manage buttons. Design should be warm, encouraging, and pregnancy-themed (soft pastels, gentle illustrations). Mobile-responsive grid layout. Fetch data from GET /api/user/dashboard endpoint that aggregates pregnancy week calculation, subscription info, recent guides, symptom summary.",
+      "estimatedMinutes": 85
+    },
+    {
+      "featureId": "feature-12",
+      "name": "Landing Page and Pricing",
+      "description": "Marketing landing page with compelling value proposition, feature comparison table for Basic vs Premium tiers, pricing cards, testimonials section, FAQ, and call-to-action. This is the primary conversion funnel entry point.",
+      "agentAssigned": "design-engineer",
+      "dependencies": [],
+      "files": [
+        "src/pages/Landing.tsx",
+        "src/components/Landing/Hero.tsx",
+        "src/components/Landing/Features.tsx",
+        "src/components/Landing/Pricing.tsx",
+        "src/components/Landing/Testimonials.tsx",
+        "src/components/Landing/FAQ.tsx"
+      ],
+      "detailedPrompt": "Design conversion-optimized landing page: 1) Hero with headline 'Your Pregnancy Journey, Personalized by AI' and subheadline explaining personalized weekly guides, email capture form or 'Start Free Trial' CTA, 2) Problem section highlighting generic pregnancy content problem, 3) Solution section showing AI personalization benefits with example guide screenshots, 4) Features section with icons (AI-Powered Content, Weekly Delivery, Symptom Tracking, Expert-Reviewed), 5) Pricing table comparing Basic ($8.99/mo: email guides, symptom tracking) vs Premium ($16.99/mo: +SMS, Q&A, advanced personalization) vs Bundle ($129: entire journey), 6) Social proof with testimonials, 7) FAQ section answering common questions (safety, AI vs doctor, data privacy, cancellation), 8) Footer with links. Use pregnancy-appropriate design (trustworthy, warm, professional). Mobile-first responsive design.",
+      "estimatedMinutes": 100
+    },
+    {
+      "featureId": "feature-13",
+      "name": "Admin Dashboard and Monitoring",
+      "description": "Internal admin panel for monitoring key metrics: active subscribers by tier, MRR, churn rate, guide generation success/failure rates, email delivery stats, user engagement metrics. Essential for solo operator to monitor business health.",
+      "agentAssigned": "frontend-developer",
+      "dependencies": ["feature-01", "feature-03", "feature-07"],
+      "files": [
+        "src/pages/Admin/Dashboard.tsx",
+        "src/routes/admin.ts",
+        "src/controllers/adminController.ts",
+        "src/components/Admin/MetricsCard.tsx",
+        "src/components/Admin/SubscriberChart.tsx"
+      ],
+      "detailedPrompt": "Build admin dashboard protected by admin role check: 1) Key metrics cards showing: Total Active Subscribers, MRR (monthly recurring revenue), Churn Rate (%), Guide Generation Success Rate, Email Delivery Rate, 2) Subscriber growth chart (line chart showing subscriber count over last 30 days), 3) Revenue breakdown by tier (pie chart), 4) Recent activity log (last 50 guide generations with status, last 50 subscription events), 5) System health indicators (failed jobs, API errors, low delivery rates). Endpoints: GET /api/admin/metrics, GET /api/admin/subscribers, GET /api/admin/activity-log. Add admin boolean field to User model. Use recharts or similar for visualizations. Simple, data-dense design focused on operational insights. Include CSV export for subscriber list.",
+      "estimatedMinutes": 75
+    },
+    {
+      "featureId": "feature-14",
+      "name": "Automated Testing Suite",
+      "description": "Comprehensive test coverage including unit tests for business logic (pregnancy week calculation, content generation prompts), integration tests for API endpoints and external services (Stripe, email, SMS), and critical user flow tests.",
+      "agentAssigned": "integration-tester",
+      "dependencies": ["feature-02", "feature-03", "feature-05", "feature-07"],
+      "files": [
+        "tests/unit/pregnancyCalculator.test.ts",
+        "tests/unit/aiContentGenerator.test.ts",
+        "tests/integration/auth.test.ts",
+        "tests/integration/subscription.test.ts",
+        "tests/integration/emailDelivery.test.ts",
+        "tests/e2e/onboarding.test.ts"
+      ],
+      "detailedPrompt": "Create testing suite with: 1) Unit tests for pregnancyCalculator (test week calculation from due date, edge cases for overdue), aiContentGenerator (test prompt building with different user profiles), 2) Integration tests for auth endpoints (signup, login, JWT validation), subscription flow (create checkout, webhook handling, status updates), email service (mock SendGrid, verify template rendering), 3) E2E test for critical user journey: signup → onboarding → subscription purchase → guide generation → email delivery. Use Jest and Supertest for API tests. Mock external services (Stripe, OpenAI, SendGrid) in tests. Aim for 70%+ coverage on core business logic. Set up test database with seed data. Include CI/CD integration with GitHub Actions to run tests on PR.",
+      "estimatedMinutes": 90
+    },
+    {
+      "featureId": "feature-15",
+      "name": "Deployment Configuration and Environment Setup",
+      "description": "Production deployment configuration including environment variables management, database migrations, scheduled job setup (cron), monitoring/logging (Sentry), and deployment to cloud platform (Vercel/Railway/Render). Makes the service production-ready.",
+      "agentAssigned": "devops-engineer",
+      "dependencies": ["feature-06", "feature-07", "feature-08"],
+      "files": [
+        ".env.example",
+        "docker-compose.yml",
+        "Dockerfile",
+        "vercel.json",
+        "prisma/migrations/",
+        ".github/workflows/deploy.yml",
+        "docs/DEPLOYMENT.md"
+      ],
+      "detailedPrompt": "Set up production deployment: 1) Create .env.example with all required variables (DATABASE_URL, JWT_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, OPENAI_API_KEY, SENDGRID_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, FRONTEND_URL, NODE_ENV), 2) Configure Prisma migrations for database schema, 3) Set up cron jobs: daily guide generation (2 AM UTC), email delivery (9 AM UTC), SMS delivery (10 AM UTC) - use Vercel Cron or external service like EasyCron, 4) Configure Sentry for error tracking, 5) Create Dockerfile for containerized deployment option, 6) Document deployment steps for Vercel (frontend + API routes) and Railway/Render (PostgreSQL database), 7) Set up GitHub Actions workflow for automated deployments on push to main branch, 8) Create DEPLOYMENT.md with step-by-step setup instructions including Stripe webhook configuration and API key setup.",
+      "estimatedMinutes": 70
+    }
+  ]
+}
